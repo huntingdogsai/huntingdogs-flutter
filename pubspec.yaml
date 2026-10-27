@@ -1,0 +1,30 @@
+name: huntingdogs
+description: Lets huntingdogs test your Flutter app on a fresh emulator for every pull request. Add it to a QA build only; it does nothing in production.
+version: 0.1.0
+homepage: https://github.com/huntingdogsai/huntingdogs-flutter
+repository: https://github.com/huntingdogsai/huntingdogs-flutter
+issue_tracker: https://github.com/huntingdogsai/huntingdogs-flutter/issues
+topics:
+  - testing
+  - qa
+  - automation
+  - ai
+
+environment:
+  sdk: ">=3.7.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  bloc: ^9.2.1
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.3.2
+  get: ^4.7.3
+  shared_preferences: ^2.5.5
+  shared_preferences_platform_interface: ^2.4.2
+
+dev_dependencies:
+  dio: ^5.9.0
+  flutter_test:
+    sdk: flutter
+  test: ^1.30.0
