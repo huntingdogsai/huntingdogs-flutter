@@ -200,6 +200,10 @@ class OperatorApp {
     OperatorStateSerializer? stateSerializer,
     Iterable<OperatorStateProbe> stateProbes = const <OperatorStateProbe>[],
   }) async {
+    // Trust the network checkpoint's certificate before anything else, so the app (whose first requests can
+    // fire as soon as it builds) trusts the host-side proxy its traffic is routed through. Unconditional and
+    // a no-op without the OPERATOR_CHECKPOINT_CA_B64 dart-define; not tied to in-app HTTP capture.
+    OperatorHttpCapture.trustCheckpointCa();
     final operator = await OperatorFlutter.init(config);
     final app = OperatorApp._(
       operator: operator,

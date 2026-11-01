@@ -8,6 +8,11 @@ import 'dart:ui';
 import 'protocol.dart';
 import 'runtime.dart';
 
+/// The host-side network checkpoint's certificate authority (base64 PEM), passed to a QA build as a
+/// dart-define so the app can trust the proxy its traffic is routed through. Empty in any other build.
+const String _checkpointCaB64 =
+    String.fromEnvironment('OPERATOR_CHECKPOINT_CA_B64');
+
 class OperatorHttpCapture {
   OperatorHttpCapture._();
 
@@ -20,10 +25,27 @@ class OperatorHttpCapture {
   static VoidCallback? _mockAvailabilityDispose;
   static bool _mockLookupRegistered = false;
   static int _installCount = 0;
+  static bool _checkpointTrustAdded = false;
+
+  /// Adds the network checkpoint's certificate authority to the default TLS trust, so the app trusts the QA
+  /// proxy its traffic is routed through (the certificate arrives as a dart-define, base64 PEM). Additive —
+  /// the system roots still apply, so ordinary HTTPS is unaffected — and a no-op in any build without the
+  /// define. Runs before the first HTTPS request, which is why installEarly calls it before runApp.
+  static void trustCheckpointCa() {
+    if (_checkpointTrustAdded || _checkpointCaB64.isEmpty) return;
+    _checkpointTrustAdded = true;
+    try {
+      SecurityContext.defaultContext
+          .setTrustedCertificatesBytes(base64.decode(_checkpointCaB64));
+    } catch (_) {
+      // A malformed or already-present certificate must never crash the app under test.
+    }
+  }
 
   static VoidCallback installEarly({
     Duration rechainInterval = const Duration(milliseconds: 250),
   }) {
+    trustCheckpointCa();
     return _retainGlobalCapture(rechainInterval: rechainInterval);
   }
 
@@ -31,6 +53,7 @@ class OperatorHttpCapture {
     OperatorFlutter operator, {
     Duration rechainInterval = const Duration(milliseconds: 250),
   }) {
+    trustCheckpointCa();
     final previousActive = _activeOperator;
     _activeOperator = operator;
     _controller.operator = operator;
