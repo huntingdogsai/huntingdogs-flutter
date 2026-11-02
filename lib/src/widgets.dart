@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import 'action_registry.dart';
 import 'capture_diagnostics.dart';
+import 'frame_wait.dart';
 import 'protocol.dart';
 import 'runtime.dart';
 
@@ -409,23 +409,13 @@ class _OperatorVisualCaptureLayerState
       'framesEnabled': binding.framesEnabled,
       'lifecycle': binding.lifecycleState?.name,
     });
-    if (binding.schedulerPhase != SchedulerPhase.idle) {
-      await operatorCaptureAsyncStage(
-        'flutter.pre_warmup_end_of_frame',
-        () => binding.endOfFrame,
-      );
-    }
-    final completed = binding.endOfFrame;
-    // An explicit capture needs build/layout/paint even when the browser has
-    // suspended display-refresh callbacks. Warm-up draws are timer-driven on web;
-    // the owned browser launcher keeps those timers running while hidden.
-    operatorCaptureStage(
-      'flutter.schedule_warmup',
-      binding.scheduleWarmUpFrame,
-    );
+    // An explicit capture needs build/layout/paint even when the display has
+    // stopped asking for frames, so the wait draws its own warm-up frame, and
+    // it is bounded: a frame that never comes fails this capture, never the
+    // snapshot waiting on it. See operatorWaitForFreshFrame.
     await operatorCaptureAsyncStage(
       'flutter.warmup_completion',
-      () => completed,
+      () => operatorWaitForFreshFrame(binding),
     );
     operatorCaptureMark('flutter.frame_wait', 'exit');
   }
