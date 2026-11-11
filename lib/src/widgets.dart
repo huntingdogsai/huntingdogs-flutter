@@ -259,6 +259,10 @@ class _OperatorRuntimeLayerState extends State<OperatorRuntimeLayer> {
 
 class _OperatorVisualCaptureLayerState
     extends State<OperatorVisualCaptureLayer> {
+  /// The longest a capture waits for the frame it draws before it fails and is
+  /// tried again.
+  static const Duration _frameWaitLimit = Duration(seconds: 5);
+
   final GlobalKey _boundaryKey = GlobalKey(debugLabel: 'operator-visual-root');
   bool _captureScheduled = false;
   int _captureFailures = 0;
@@ -410,9 +414,15 @@ class _OperatorVisualCaptureLayerState
       'lifecycle': binding.lifecycleState?.name,
     });
     if (binding.schedulerPhase != SchedulerPhase.idle) {
+      // Asked from a frame's post-frame callbacks (the automatic capture runs
+      // there), endOfFrame waits for the next frame without asking for one, and
+      // a still screen never draws it: the capture would wait forever, and every
+      // capture after it behind it (measured 2026-11-11 on an Android emulator:
+      // a capture stuck until a frame was forced). Ask for that frame.
+      binding.ensureVisualUpdate();
       await operatorCaptureAsyncStage(
         'flutter.pre_warmup_end_of_frame',
-        () => binding.endOfFrame,
+        () => binding.endOfFrame.timeout(_frameWaitLimit),
       );
     }
     final completed = binding.endOfFrame;
@@ -423,9 +433,11 @@ class _OperatorVisualCaptureLayerState
       'flutter.schedule_warmup',
       binding.scheduleWarmUpFrame,
     );
+    // Bounded like the readbacks below: a frame that never comes fails this
+    // capture, which is tried again, instead of holding every capture after it.
     await operatorCaptureAsyncStage(
       'flutter.warmup_completion',
-      () => completed,
+      () => completed.timeout(_frameWaitLimit),
     );
     operatorCaptureMark('flutter.frame_wait', 'exit');
   }

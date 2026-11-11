@@ -25,4 +25,23 @@ void main() {
     await tester.pump();
     expect(completed, isTrue);
   });
+
+  testWidgets('ensureVisualUpdate in post-frame callbacks asks for the frame endOfFrame waits for', (tester) async {
+    // The primitive _waitForFreshFrame now calls before it waits (measured
+    // 2026-11-11 on an Android emulator: without it a capture stayed stuck
+    // until a frame was forced).
+    final binding = tester.binding;
+    var completed = false;
+    binding.addPostFrameCallback((_) {
+      binding.ensureVisualUpdate();
+      binding.endOfFrame.then((_) { completed = true; });
+    });
+    binding.scheduleFrame();
+    await tester.pump();
+    expect(completed, isFalse);
+    expect(binding.hasScheduledFrame, isTrue);
+    // The next frame is already asked for: delivering it completes the wait.
+    await tester.pump();
+    expect(completed, isTrue);
+  });
 }
